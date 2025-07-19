@@ -1,301 +1,229 @@
-import { View, Text, ScrollView, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MessageCircle, Send, Search, Phone } from 'lucide-react-native';
-import { blink } from '@/lib/blink';
+import { MessageCircle, Search, MoreVertical, Phone, Clock, CheckCheck } from 'lucide-react-native';
+import { mockMessages } from '../../lib/mockData';
+import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 
-interface Conversation {
-  id: string;
-  job_title: string;
-  shipper_name: string;
-  last_message: string;
-  last_message_time: string;
-  unread_count: number;
-  job_id: string;
-}
+export default function MessagesScreen() {
+  const [messages, setMessages] = useState(mockMessages);
 
-interface Message {
-  id: string;
-  sender_type: 'driver' | 'shipper';
-  message: string;
-  created_at: string;
-}
-
-export default function Messages() {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    loadConversations();
-  }, []);
-
-  const loadConversations = async () => {
-    try {
-      // Load conversations from database
-      // For now, using mock data
-      setConversations([
-        {
-          id: '1',
-          job_title: 'Chicago to Detroit Freight',
-          shipper_name: 'John Smith',
-          last_message: 'Thanks for the update! ETA looks good.',
-          last_message_time: '2024-01-22T14:30:00',
-          unread_count: 0,
-          job_id: 'job_1',
-        },
-        {
-          id: '2',
-          job_title: 'Miami to Orlando Express',
-          shipper_name: 'Sarah Johnson',
-          last_message: 'Please confirm pickup time',
-          last_message_time: '2024-01-22T12:15:00',
-          unread_count: 2,
-          job_id: 'job_2',
-        },
-        {
-          id: '3',
-          job_title: 'Houston to Dallas Run',
-          shipper_name: 'Mike Wilson',
-          last_message: 'Load is ready for pickup',
-          last_message_time: '2024-01-22T10:45:00',
-          unread_count: 1,
-          job_id: 'job_3',
-        },
-      ]);
-    } catch (error) {
-      console.error('Error loading conversations:', error);
-    }
-  };
-
-  const loadMessages = async (conversationId: string) => {
-    try {
-      // Load messages for specific conversation
-      // For now, using mock data
-      setMessages([
-        {
-          id: '1',
-          sender_type: 'shipper',
-          message: 'Hi! Just wanted to confirm the pickup time for tomorrow.',
-          created_at: '2024-01-22T10:00:00',
-        },
-        {
-          id: '2',
-          sender_type: 'driver',
-          message: 'Hello! Yes, I can be there at 8 AM as scheduled.',
-          created_at: '2024-01-22T10:05:00',
-        },
-        {
-          id: '3',
-          sender_type: 'shipper',
-          message: 'Perfect! The load will be ready. Please call when you arrive.',
-          created_at: '2024-01-22T10:10:00',
-        },
-        {
-          id: '4',
-          sender_type: 'driver',
-          message: 'Will do. See you tomorrow!',
-          created_at: '2024-01-22T10:12:00',
-        },
-      ]);
-    } catch (error) {
-      console.error('Error loading messages:', error);
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedConversation) return;
-
-    try {
-      const user = await blink.auth.me();
-      const messageData = {
-        id: `msg_${Date.now()}`,
-        job_id: selectedConversation,
-        sender_id: user.id,
-        sender_type: 'driver',
-        message: newMessage.trim(),
-        created_at: new Date().toISOString(),
-      };
-
-      await blink.db.messages.create(messageData);
-      
-      // Add to local state
-      setMessages(prev => [...prev, {
-        id: messageData.id,
-        sender_type: 'driver',
-        message: messageData.message,
-        created_at: messageData.created_at,
-      }]);
-      
-      setNewMessage('');
-    } catch (error) {
-      console.error('Error sending message:', error);
-    }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadConversations();
-    setRefreshing(false);
-  };
-
-  const ConversationItem = ({ conversation }: { conversation: Conversation }) => (
-    <TouchableOpacity 
-      onPress={() => {
-        setSelectedConversation(conversation.id);
-        loadMessages(conversation.id);
-      }}
-      className={`p-4 border-b border-gray-100 ${selectedConversation === conversation.id ? 'bg-primary/5' : 'bg-white'}`}
-    >
-      <View className="flex-row justify-between items-start">
-        <View className="flex-1">
-          <Text className="font-inter-semibold text-gray-900 mb-1">
-            {conversation.shipper_name}
-          </Text>
-          <Text className="text-sm text-gray-600 mb-1">
-            {conversation.job_title}
-          </Text>
-          <Text className="text-sm text-gray-500" numberOfLines={1}>
-            {conversation.last_message}
-          </Text>
-        </View>
-        <View className="items-end">
-          <Text className="text-xs text-gray-500 mb-1">
-            {new Date(conversation.last_message_time).toLocaleTimeString([], { 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            })}
-          </Text>
-          {conversation.unread_count > 0 && (
-            <View className="bg-accent w-5 h-5 rounded-full items-center justify-center">
-              <Text className="text-white text-xs font-inter-semibold">
-                {conversation.unread_count}
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const MessageBubble = ({ message }: { message: Message }) => (
-    <View className={`mb-3 ${message.sender_type === 'driver' ? 'items-end' : 'items-start'}`}>
-      <View className={`max-w-[80%] p-3 rounded-2xl ${
-        message.sender_type === 'driver' 
-          ? 'bg-primary rounded-br-md' 
-          : 'bg-gray-100 rounded-bl-md'
-      }`}>
-        <Text className={`font-inter ${
-          message.sender_type === 'driver' ? 'text-white' : 'text-gray-900'
-        }`}>
-          {message.message}
-        </Text>
-      </View>
-      <Text className="text-xs text-gray-500 mt-1 px-1">
-        {new Date(message.created_at).toLocaleTimeString([], { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        })}
-      </Text>
-    </View>
-  );
-
-  if (selectedConversation) {
-    const conversation = conversations.find(c => c.id === selectedConversation);
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
     
-    return (
-      <SafeAreaView className="flex-1 bg-white">
-        {/* Chat Header */}
-        <View className="px-6 py-4 bg-white border-b border-gray-100 flex-row items-center justify-between">
-          <View className="flex-1">
-            <TouchableOpacity onPress={() => setSelectedConversation(null)}>
-              <Text className="text-primary font-inter-semibold">← Back</Text>
-            </TouchableOpacity>
-            <Text className="text-lg font-inter-semibold text-gray-900 mt-1">
-              {conversation?.shipper_name}
-            </Text>
-            <Text className="text-sm text-gray-600">
-              {conversation?.job_title}
-            </Text>
-          </View>
-          <TouchableOpacity className="bg-primary/10 p-2 rounded-lg">
-            <Phone color="#1B365D" size={20} />
-          </TouchableOpacity>
-        </View>
+    if (diffInHours < 1) {
+      return 'Just now';
+    } else if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
+    } else if (diffInHours < 48) {
+      return 'Yesterday';
+    } else {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+  };
 
-        {/* Messages */}
-        <ScrollView className="flex-1 px-4 py-4">
-          {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))}
-        </ScrollView>
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
 
-        {/* Message Input */}
-        <View className="px-4 py-4 bg-white border-t border-gray-100">
-          <View className="flex-row items-center space-x-3">
-            <TextInput
-              className="flex-1 bg-gray-50 rounded-full px-4 py-3 font-inter"
-              placeholder="Type a message..."
-              value={newMessage}
-              onChangeText={setNewMessage}
-              multiline
-            />
-            <TouchableOpacity 
-              onPress={sendMessage}
-              className="bg-primary p-3 rounded-full"
-              disabled={!newMessage.trim()}
-            >
-              <Send color="#FFFFFF" size={20} />
+  const MessageCard = ({ message, index }) => (
+    <Card 
+      animated 
+      delay={index * 100}
+      onPress={() => {}}
+      variant="default" 
+      padding="lg" 
+      margin="none"
+      className="mb-2 mx-4"
+    >
+      <View className="flex-row items-start">
+        {/* Avatar */}
+        <View className="bg-primary rounded-full w-12 h-12 items-center justify-center mr-4">
+          <Text className="text-white font-inter-bold text-base">
+            {getInitials(message.shipper_name)}
+          </Text>
+        </View>
+        
+        <View className="flex-1">
+          {/* Header */}
+          <View className="flex-row justify-between items-start mb-2">
+            <View className="flex-1">
+              <Text className="text-lg font-inter-bold text-gray-900">
+                {message.shipper_name}
+              </Text>
+              <View className="flex-row items-center mt-1">
+                <Text className="text-primary text-sm font-inter-semibold">
+                  Job #{message.job_id.split('_')[1]}
+                </Text>
+                <View className="w-1 h-1 bg-gray-400 rounded-full mx-2" />
+                <Text className="text-sm text-gray-500 font-inter">
+                  {formatTime(message.timestamp)}
+                </Text>
+              </View>
+            </View>
+            
+            <View className="flex-row items-center">
+              {message.unread && (
+                <View className="bg-accent w-2.5 h-2.5 rounded-full mr-3" />
+              )}
+              <TouchableOpacity>
+                <MoreVertical color="#6B7280" size={20} />
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          {/* Message Preview */}
+          <Text 
+            className={`text-gray-600 mb-3 ${
+              message.unread ? 'font-inter-semibold' : 'font-inter'
+            }`}
+            numberOfLines={2}
+          >
+            {message.last_message}
+          </Text>
+          
+          {/* Action Buttons */}
+          <View className="flex-row space-x-2">
+            <TouchableOpacity className="bg-primary-50 px-3 py-2 rounded-lg flex-row items-center">
+              <MessageCircle color="#1B365D" size={16} />
+              <Text className="text-primary text-sm font-inter-semibold ml-1">
+                Reply
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity className="bg-gray-50 px-3 py-2 rounded-lg flex-row items-center">
+              <Phone color="#6B7280" size={16} />
+              <Text className="text-gray-700 text-sm font-inter-semibold ml-1">
+                Call
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
-      </SafeAreaView>
-    );
-  }
+      </View>
+    </Card>
+  );
+
+  const unreadCount = messages.filter(msg => msg.unread).length;
 
   return (
     <SafeAreaView className="flex-1 bg-background">
       {/* Header */}
-      <View className="px-6 py-4 bg-white border-b border-gray-100">
-        <Text className="text-2xl font-inter-semibold text-primary mb-4">
-          Messages
-        </Text>
-        
-        {/* Search Bar */}
-        <View className="flex-row items-center bg-gray-50 rounded-lg px-3 py-2">
-          <Search color="#6B7280" size={20} />
-          <TextInput
-            className="flex-1 ml-2 text-gray-900 font-inter"
-            placeholder="Search conversations..."
-          />
-        </View>
-      </View>
-
-      {/* Conversations List */}
-      <ScrollView 
-        className="flex-1"
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+      <Animated.View 
+        entering={FadeInDown.duration(600)}
+        className="px-6 py-6 bg-white border-b border-gray-100"
       >
-        {conversations.map((conversation) => (
-          <ConversationItem key={conversation.id} conversation={conversation} />
-        ))}
-
-        {conversations.length === 0 && (
-          <View className="flex-1 justify-center items-center py-12">
-            <MessageCircle color="#6B7280" size={48} />
-            <Text className="text-lg font-inter-semibold text-gray-900 mt-4">
-              No messages yet
+        <View className="flex-row justify-between items-center mb-6">
+          <View>
+            <Text className="text-2xl font-inter-bold text-primary">
+              Messages
             </Text>
-            <Text className="text-gray-600 text-center mt-2">
-              Your conversations with shippers will appear here
+            {unreadCount > 0 && (
+              <Text className="text-gray-600 mt-1 font-inter">
+                <Text className="font-inter-semibold text-accent">{unreadCount}</Text> unread message{unreadCount !== 1 ? 's' : ''}
+              </Text>
+            )}
+          </View>
+          <TouchableOpacity className="bg-gray-50 p-3 rounded-xl">
+            <Search color="#6B7280" size={24} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Quick Stats */}
+        <View className="flex-row space-x-4">
+          <View className="bg-primary-50 px-4 py-3 rounded-xl flex-1">
+            <Text className="text-primary-700 text-sm font-inter">Total</Text>
+            <Text className="text-primary-900 text-xl font-inter-bold">
+              {messages.length}
             </Text>
           </View>
+          
+          <View className="bg-accent-50 px-4 py-3 rounded-xl flex-1">
+            <Text className="text-accent-700 text-sm font-inter">Unread</Text>
+            <Text className="text-accent-900 text-xl font-inter-bold">
+              {unreadCount}
+            </Text>
+          </View>
+          
+          <View className="bg-success-50 px-4 py-3 rounded-xl flex-1">
+            <Text className="text-success-700 text-sm font-inter">Active</Text>
+            <Text className="text-success-900 text-xl font-inter-bold">
+              {messages.filter(m => m.unread).length}
+            </Text>
+          </View>
+        </View>
+      </Animated.View>
+
+      {/* Messages List */}
+      <ScrollView className="flex-1 py-4" showsVerticalScrollIndicator={false}>
+        {messages.length > 0 ? (
+          <>
+            <Animated.View entering={FadeInRight.delay(200).duration(600)}>
+              <Text className="text-lg font-inter-bold text-gray-900 mb-4 px-6">
+                Recent Conversations
+              </Text>
+            </Animated.View>
+            
+            {messages.map((message, index) => (
+              <MessageCard key={message.id} message={message} index={index} />
+            ))}
+          </>
+        ) : (
+          <Animated.View 
+            entering={FadeInRight.delay(300).duration(600)}
+            className="flex-1 justify-center items-center py-20"
+          >
+            <View className="bg-gray-50 p-8 rounded-3xl mb-6">
+              <MessageCircle color="#D1D5DB" size={64} />
+            </View>
+            <Text className="text-xl font-inter-bold text-gray-500 mb-2">
+              No Messages
+            </Text>
+            <Text className="text-gray-400 text-center font-inter mb-8 px-8">
+              Messages from shippers will appear here when you have active jobs.
+            </Text>
+            <Button
+              title="Find Jobs"
+              onPress={() => {}}
+              variant="primary"
+              size="lg"
+              icon={MessageCircle}
+            />
+          </Animated.View>
         )}
+
+        <View className="h-20" />
       </ScrollView>
+
+      {/* Quick Actions */}
+      {messages.length > 0 && (
+        <Animated.View 
+          entering={FadeInDown.delay(800).duration(600)}
+          className="px-6 py-4 bg-white border-t border-gray-100"
+        >
+          <View className="flex-row space-x-3">
+            <Button
+              title="Mark All Read"
+              onPress={() => {}}
+              variant="outline"
+              size="md"
+              icon={CheckCheck}
+              className="flex-1"
+            />
+            <Button
+              title="Compose"
+              onPress={() => {}}
+              variant="primary"
+              size="md"
+              icon={MessageCircle}
+              className="flex-1"
+            />
+          </View>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }

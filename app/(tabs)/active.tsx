@@ -1,273 +1,263 @@
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MapPin, Clock, Phone, MessageCircle, Navigation, CheckCircle } from 'lucide-react-native';
-import { blink } from '@/lib/blink';
+import { MapPin, Clock, Phone, MessageCircle, CheckCircle, Truck, Navigation, AlertCircle } from 'lucide-react-native';
+import { mockActiveJobs } from '../../lib/mockData';
+import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { StatusBadge } from '../../components/ui/StatusBadge';
+import { ProgressBar } from '../../components/ui/ProgressBar';
+import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 
-interface ActiveJob {
-  id: string;
-  title: string;
-  pickup_location: string;
-  delivery_location: string;
-  pickup_date: string;
-  delivery_date: string;
-  rate: number;
-  status: string;
-  shipper_contact: string;
-  current_status: string;
-}
-
-export default function ActiveJobs() {
-  const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    loadActiveJobs();
-  }, []);
-
-  const loadActiveJobs = async () => {
-    try {
-      // Load active jobs for the current driver
-      const user = await blink.auth.me();
-      if (user) {
-        const jobs = await blink.db.jobs.list({
-          where: { 
-            assigned_driver_id: user.id,
-            status: 'in_progress'
-          },
-          orderBy: { pickup_date: 'asc' },
-        });
-        setActiveJobs(jobs);
-      }
-    } catch (error) {
-      console.error('Error loading active jobs:', error);
-      // Mock data for demo
-      setActiveJobs([
-        {
-          id: '1',
-          title: 'Chicago to Detroit Freight',
-          pickup_location: 'Chicago, IL',
-          delivery_location: 'Detroit, MI',
-          pickup_date: '2024-01-22T08:00:00',
-          delivery_date: '2024-01-22T18:00:00',
-          rate: 2400,
-          status: 'in_progress',
-          shipper_contact: 'John Smith',
-          current_status: 'loaded',
-        },
-        {
-          id: '2',
-          title: 'Miami to Orlando Express',
-          pickup_location: 'Miami, FL',
-          delivery_location: 'Orlando, FL',
-          pickup_date: '2024-01-23T06:00:00',
-          delivery_date: '2024-01-23T14:00:00',
-          rate: 1850,
-          status: 'in_progress',
-          shipper_contact: 'Sarah Johnson',
-          current_status: 'en_route_pickup',
-        },
-      ]);
-    }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadActiveJobs();
-    setRefreshing(false);
-  };
+export default function ActiveJobsScreen() {
+  const [activeJobs, setActiveJobs] = useState(mockActiveJobs);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'en_route_pickup': return '#F59E0B';
-      case 'arrived_pickup': return '#3B82F6';
-      case 'loaded': return '#10B981';
-      case 'en_route_delivery': return '#8B5CF6';
-      case 'delivered': return '#059669';
-      default: return '#6B7280';
+      case 'en_route_pickup':
+        return '#F59E0B';
+      case 'loaded':
+        return '#3B82F6';
+      case 'en_route_delivery':
+        return '#8B5CF6';
+      case 'delivered':
+        return '#10B981';
+      default:
+        return '#6B7280';
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'en_route_pickup': return 'En Route to Pickup';
-      case 'arrived_pickup': return 'Arrived at Pickup';
-      case 'loaded': return 'Loaded';
-      case 'en_route_delivery': return 'En Route to Delivery';
-      case 'delivered': return 'Delivered';
-      default: return 'Unknown';
-    }
-  };
-
-  const updateJobStatus = async (jobId: string, newStatus: string) => {
-    try {
-      // Update job status in database
-      await blink.db.job_status_updates.create({
-        id: `status_${Date.now()}`,
-        job_id: jobId,
-        driver_id: 'current_driver_id', // Replace with actual driver ID
-        user_id: (await blink.auth.me()).id,
-        status: newStatus,
-        timestamp: new Date().toISOString(),
-      });
-      
-      // Refresh the jobs list
-      await loadActiveJobs();
-    } catch (error) {
-      console.error('Error updating job status:', error);
-    }
-  };
-
-  const ActiveJobCard = ({ job }: { job: ActiveJob }) => (
-    <View className="bg-white rounded-xl p-4 mb-4 shadow-sm border border-gray-100">
-      <View className="flex-row justify-between items-start mb-3">
+  const ActiveJobCard = ({ job, index }) => (
+    <Card 
+      animated 
+      delay={index * 150}
+      variant="elevated" 
+      padding="lg" 
+      margin="sm"
+      className="mb-4"
+    >
+      {/* Header */}
+      <View className="flex-row justify-between items-start mb-4">
         <View className="flex-1">
-          <Text className="text-lg font-inter-semibold text-gray-900 mb-1">
-            {job.title}
+          <Text className="text-lg font-inter-bold text-gray-900 mb-2">
+            {job.shipper_name}
           </Text>
-          <View className="flex-row items-center mb-2">
-            <MapPin color="#6B7280" size={16} />
-            <Text className="text-sm text-gray-600 ml-1">
-              {job.pickup_location} → {job.delivery_location}
+          <StatusBadge status={job.status} size="md" />
+        </View>
+        <View className="items-end">
+          <Text className="text-2xl font-inter-bold text-accent-600 mb-1">
+            ${job.rate.toLocaleString()}
+          </Text>
+          <Text className="text-sm text-gray-500 font-inter">
+            Job #{job.id.split('_')[1]}
+          </Text>
+        </View>
+      </View>
+
+      {/* Progress Section */}
+      <View className="bg-gray-50 p-4 rounded-xl mb-4">
+        <ProgressBar
+          progress={job.progress}
+          color={getStatusColor(job.status)}
+          showPercentage
+          animated
+          className="mb-4"
+        />
+        
+        {/* Timeline */}
+        <View className="space-y-3">
+          <View className="flex-row items-center">
+            <View className={`w-3 h-3 rounded-full mr-3 ${
+              job.progress >= 25 ? 'bg-success-500' : 'bg-gray-300'
+            }`} />
+            <Text className={`text-sm font-inter-medium ${
+              job.progress >= 25 ? 'text-gray-900' : 'text-gray-500'
+            }`}>
+              Job Accepted
+            </Text>
+          </View>
+          
+          <View className="flex-row items-center">
+            <View className={`w-3 h-3 rounded-full mr-3 ${
+              job.progress >= 50 ? 'bg-success-500' : job.progress >= 25 ? 'bg-warning-500' : 'bg-gray-300'
+            }`} />
+            <Text className={`text-sm font-inter-medium ${
+              job.progress >= 50 ? 'text-gray-900' : job.progress >= 25 ? 'text-warning-700' : 'text-gray-500'
+            }`}>
+              En Route to Pickup
+            </Text>
+          </View>
+          
+          <View className="flex-row items-center">
+            <View className={`w-3 h-3 rounded-full mr-3 ${
+              job.progress >= 75 ? 'bg-success-500' : job.progress >= 50 ? 'bg-info-500' : 'bg-gray-300'
+            }`} />
+            <Text className={`text-sm font-inter-medium ${
+              job.progress >= 75 ? 'text-gray-900' : job.progress >= 50 ? 'text-info-700' : 'text-gray-500'
+            }`}>
+              Loaded & En Route
+            </Text>
+          </View>
+          
+          <View className="flex-row items-center">
+            <View className={`w-3 h-3 rounded-full mr-3 ${
+              job.progress >= 100 ? 'bg-success-500' : 'bg-gray-300'
+            }`} />
+            <Text className={`text-sm font-inter-medium ${
+              job.progress >= 100 ? 'text-gray-900' : 'text-gray-500'
+            }`}>
+              Delivered
             </Text>
           </View>
         </View>
-        <View className="bg-accent/10 px-3 py-1 rounded-full">
-          <Text className="text-accent text-sm font-inter-semibold">
-            ${job.rate.toLocaleString()}
-          </Text>
-        </View>
       </View>
 
-      {/* Status */}
-      <View className="flex-row items-center mb-3">
-        <View 
-          className="w-3 h-3 rounded-full mr-2"
-          style={{ backgroundColor: getStatusColor(job.current_status) }}
-        />
-        <Text className="text-sm font-inter-semibold" style={{ color: getStatusColor(job.current_status) }}>
-          {getStatusText(job.current_status)}
-        </Text>
-      </View>
-
-      {/* Timeline */}
+      {/* Route Information */}
       <View className="mb-4">
-        <View className="flex-row items-center justify-between mb-2">
-          <View className="flex-row items-center">
-            <Clock color="#6B7280" size={16} />
-            <Text className="text-sm text-gray-600 ml-1">Pickup</Text>
-          </View>
-          <Text className="text-sm font-inter-semibold text-gray-900">
-            {new Date(job.pickup_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <View className="flex-row items-center mb-3">
+          <MapPin color="#6B7280" size={18} />
+          <Text className="text-gray-700 ml-2 flex-1 font-inter-medium">
+            {job.pickup_location} → {job.delivery_location}
           </Text>
         </View>
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center">
-            <Clock color="#6B7280" size={16} />
-            <Text className="text-sm text-gray-600 ml-1">Delivery</Text>
+        
+        <View className="flex-row justify-between">
+          <View className="flex-1 mr-2">
+            <View className="flex-row items-center">
+              <Clock color="#6B7280" size={16} />
+              <Text className="text-gray-600 ml-2 text-sm font-inter">
+                Pickup
+              </Text>
+            </View>
+            <Text className="text-gray-900 font-inter-semibold ml-6">
+              {job.estimated_pickup}
+            </Text>
           </View>
-          <Text className="text-sm font-inter-semibold text-gray-900">
-            {new Date(job.delivery_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
+          
+          <View className="flex-1 ml-2">
+            <View className="flex-row items-center">
+              <Clock color="#6B7280" size={16} />
+              <Text className="text-gray-600 ml-2 text-sm font-inter">
+                Delivery
+              </Text>
+            </View>
+            <Text className="text-gray-900 font-inter-semibold ml-6">
+              {job.estimated_delivery}
+            </Text>
+          </View>
         </View>
       </View>
 
-      {/* Actions */}
-      <View className="flex-row space-x-2">
-        <TouchableOpacity className="flex-1 bg-primary/10 flex-row items-center justify-center py-2 rounded-lg">
-          <Phone color="#1B365D" size={16} />
-          <Text className="text-primary font-inter-semibold text-sm ml-1">Call</Text>
-        </TouchableOpacity>
+      {/* Action Buttons */}
+      <View className="space-y-3">
+        <View className="flex-row space-x-3">
+          <Button
+            title="Call Shipper"
+            onPress={() => {}}
+            variant="primary"
+            size="md"
+            icon={Phone}
+            className="flex-1"
+          />
+          <Button
+            title="Message"
+            onPress={() => {}}
+            variant="outline"
+            size="md"
+            icon={MessageCircle}
+            className="flex-1"
+          />
+        </View>
         
-        <TouchableOpacity className="flex-1 bg-primary/10 flex-row items-center justify-center py-2 rounded-lg">
-          <MessageCircle color="#1B365D" size={16} />
-          <Text className="text-primary font-inter-semibold text-sm ml-1">Message</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity className="flex-1 bg-accent/10 flex-row items-center justify-center py-2 rounded-lg">
-          <Navigation color="#F59E0B" size={16} />
-          <Text className="text-accent font-inter-semibold text-sm ml-1">Navigate</Text>
-        </TouchableOpacity>
+        <View className="flex-row space-x-3">
+          <Button
+            title="Navigate"
+            onPress={() => {}}
+            variant="accent"
+            size="md"
+            icon={Navigation}
+            className="flex-1"
+          />
+          <Button
+            title="Update Status"
+            onPress={() => {}}
+            variant="secondary"
+            size="md"
+            icon={CheckCircle}
+            className="flex-1"
+          />
+        </View>
       </View>
 
-      {/* Status Update Buttons */}
-      <View className="mt-3 pt-3 border-t border-gray-100">
-        <Text className="text-sm font-inter-semibold text-gray-900 mb-2">Update Status:</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View className="flex-row space-x-2">
-            {job.current_status === 'en_route_pickup' && (
-              <TouchableOpacity 
-                onPress={() => updateJobStatus(job.id, 'arrived_pickup')}
-                className="bg-blue-100 px-3 py-1 rounded-full"
-              >
-                <Text className="text-blue-700 text-xs font-inter-semibold">Arrived at Pickup</Text>
-              </TouchableOpacity>
-            )}
-            {job.current_status === 'arrived_pickup' && (
-              <TouchableOpacity 
-                onPress={() => updateJobStatus(job.id, 'loaded')}
-                className="bg-green-100 px-3 py-1 rounded-full"
-              >
-                <Text className="text-green-700 text-xs font-inter-semibold">Loaded</Text>
-              </TouchableOpacity>
-            )}
-            {job.current_status === 'loaded' && (
-              <TouchableOpacity 
-                onPress={() => updateJobStatus(job.id, 'en_route_delivery')}
-                className="bg-purple-100 px-3 py-1 rounded-full"
-              >
-                <Text className="text-purple-700 text-xs font-inter-semibold">En Route to Delivery</Text>
-              </TouchableOpacity>
-            )}
-            {job.current_status === 'en_route_delivery' && (
-              <TouchableOpacity 
-                onPress={() => updateJobStatus(job.id, 'delivered')}
-                className="bg-green-100 px-3 py-1 rounded-full flex-row items-center"
-              >
-                <CheckCircle color="#059669" size={12} />
-                <Text className="text-green-700 text-xs font-inter-semibold ml-1">Mark Delivered</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </ScrollView>
-      </View>
-    </View>
+      {/* Emergency Contact */}
+      {job.progress > 0 && job.progress < 100 && (
+        <View className="mt-4 pt-4 border-t border-gray-200">
+          <TouchableOpacity className="flex-row items-center justify-center py-2">
+            <AlertCircle color="#EF4444" size={16} />
+            <Text className="text-error-600 font-inter-semibold ml-2">
+              Emergency Contact
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </Card>
   );
 
   return (
     <SafeAreaView className="flex-1 bg-background">
       {/* Header */}
-      <View className="px-6 py-4 bg-white border-b border-gray-100">
-        <Text className="text-2xl font-inter-semibold text-primary">
+      <Animated.View 
+        entering={FadeInDown.duration(600)}
+        className="px-6 py-6 bg-white border-b border-gray-100"
+      >
+        <Text className="text-2xl font-inter-bold text-primary mb-2">
           Active Jobs
         </Text>
-        <Text className="text-gray-600 font-inter">
-          {activeJobs.length} job{activeJobs.length !== 1 ? 's' : ''} in progress
-        </Text>
-      </View>
+        <View className="flex-row items-center justify-between">
+          <Text className="text-gray-600 font-inter">
+            <Text className="font-inter-semibold">{activeJobs.length}</Text> jobs in progress
+          </Text>
+          {activeJobs.length > 0 && (
+            <View className="bg-success-50 px-3 py-1 rounded-full">
+              <Text className="text-success-700 text-sm font-inter-semibold">
+                All on track
+              </Text>
+            </View>
+          )}
+        </View>
+      </Animated.View>
 
       {/* Jobs List */}
-      <ScrollView 
-        className="flex-1 px-6 py-4"
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        {activeJobs.map((job) => (
-          <ActiveJobCard key={job.id} job={job} />
-        ))}
-
-        {activeJobs.length === 0 && (
-          <View className="flex-1 justify-center items-center py-12">
-            <Clock color="#6B7280" size={48} />
-            <Text className="text-lg font-inter-semibold text-gray-900 mt-4">
-              No active jobs
+      <ScrollView className="flex-1 px-4 py-4" showsVerticalScrollIndicator={false}>
+        {activeJobs.length > 0 ? (
+          activeJobs.map((job, index) => (
+            <ActiveJobCard key={job.id} job={job} index={index} />
+          ))
+        ) : (
+          <Animated.View 
+            entering={FadeInRight.delay(300).duration(600)}
+            className="flex-1 justify-center items-center py-20"
+          >
+            <View className="bg-gray-50 p-8 rounded-3xl mb-6">
+              <Truck color="#D1D5DB" size={64} />
+            </View>
+            <Text className="text-xl font-inter-bold text-gray-500 mb-2">
+              No Active Jobs
             </Text>
-            <Text className="text-gray-600 text-center mt-2">
-              Your active jobs will appear here
+            <Text className="text-gray-400 text-center font-inter mb-8 px-8">
+              When you accept jobs, they'll appear here for tracking and management.
             </Text>
-          </View>
+            <Button
+              title="Browse Available Jobs"
+              onPress={() => {}}
+              variant="primary"
+              size="lg"
+              icon={MapPin}
+            />
+          </Animated.View>
         )}
+
+        <View className="h-20" />
       </ScrollView>
     </SafeAreaView>
   );
